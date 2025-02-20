@@ -1,2 +1,5 @@
-filecreate_bpfeb.*
-filecreate_bpfel.*
+bpf_bpfeb*
+bpf_bpfel*
+filecreate_bpfeb*
+filecreate_bpfel*
+fileCreate      # binary output
