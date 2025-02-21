@@ -1,21 +1,19 @@
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags "-O2 -g -Wall" bpf fileCreate.c -- -I/path/to/vmlinux/headers
-
-package main
+package fileCreate
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
 )
+
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags "-O2 -g -Wall" bpf fileCreate.c
 
 // fileCreateEvent matches the struct file_create_event in our BPF program.
 type fileCreateEvent struct {
@@ -27,77 +25,76 @@ type fileCreateEvent struct {
 	EventType uint32 // 1: open, 2: openat
 }
 
-func main() {
+// Run starts the fileCreate event collector and runs until the context is cancelled.
+func Run(ctx context.Context) error {
 	// Remove resource limits.
 	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatalf("Failed to remove memlock limit: %v", err)
+		return fmt.Errorf("failed to remove memlock limit: %w", err)
 	}
 
 	// Load pre-compiled BPF objects.
 	objs := bpfObjects{}
 	if err := loadBpfObjects(&objs, nil); err != nil {
-		log.Fatalf("loading objects: %v", err)
+		return fmt.Errorf("loading objects: %w", err)
 	}
 	defer objs.Close()
 
 	// Attach tracepoints.
 	tpOpenat, err := link.Tracepoint("syscalls", "sys_enter_openat", objs.TraceSysEnterOpenat, nil)
 	if err != nil {
-		log.Fatalf("Failed to attach tracepoint sys_enter_openat: %v", err)
+		return fmt.Errorf("failed to attach tracepoint sys_enter_openat: %w", err)
 	}
 	defer tpOpenat.Close()
 
 	tpOpen, err := link.Tracepoint("syscalls", "sys_enter_open", objs.TraceSysEnterOpen, nil)
 	if err != nil {
-		log.Fatalf("Failed to attach tracepoint sys_enter_open: %v", err)
+		return fmt.Errorf("failed to attach tracepoint sys_enter_open: %w", err)
 	}
 	defer tpOpen.Close()
 
 	// Open a ring buffer reader on the map.
 	rd, err := ringbuf.NewReader(objs.FileCreateEventMap)
 	if err != nil {
-		log.Fatalf("Failed to open ring buffer: %v", err)
+		return fmt.Errorf("failed to open ring buffer: %w", err)
 	}
 	defer rd.Close()
 
-	// Setup signal handling for graceful exit.
-	stopper := make(chan os.Signal, 1)
-	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-stopper
-		rd.Close()
-	}()
-
-	log.Println("Listening for file create events (open and openat). Press Ctrl+C to exit.")
+	log.Println("Listening for file create events (open and openat).")
 
 	var event fileCreateEvent
 	for {
-		// Read the next event.
-		record, err := rd.Read()
-		if err != nil {
-			if errors.Is(err, ringbuf.ErrClosed) {
-				log.Println("Exiting...")
-				return
+		select {
+		case <-ctx.Done():
+			log.Println("fileCreate event collector stopping")
+			return nil
+		default:
+			// Read the next event.
+			record, err := rd.Read()
+			if err != nil {
+				if errors.Is(err, ringbuf.ErrClosed) {
+					log.Println("ring buffer closed, exiting")
+					return nil
+				}
+				log.Printf("error reading from ring buffer: %v", err)
+				continue
 			}
-			log.Printf("Error reading from ring buffer: %v", err)
-			continue
-		}
 
-		// Parse the event.
-		err = binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event)
-		if err != nil {
-			log.Printf("Error parsing event: %v", err)
-			continue
-		}
+			// Parse the event.
+			err = binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event)
+			if err != nil {
+				log.Printf("error parsing event: %v", err)
+				continue
+			}
 
-		// Convert the filename by trimming any trailing nulls.
-		filename := string(event.Filename[:])
-		syscallName := "open"
-		if event.EventType == 2 {
-			syscallName = "openat"
-		}
+			// Convert the filename by trimming any trailing nulls.
+			filename := string(event.Filename[:])
+			syscallName := "open"
+			if event.EventType == 2 {
+				syscallName = "openat"
+			}
 
-		fmt.Printf("PID: %d, UID: %d, Syscall: %s, Filename: %s, Flags: %d, Mode: %d\n",
-			event.PID, event.UID, syscallName, filename, event.Flags, event.Mode)
+			fmt.Printf("PID: %d, UID: %d, Syscall: %s, Filename: %s, Flags: %d, Mode: %d\n",
+				event.PID, event.UID, syscallName, filename, event.Flags, event.Mode)
+		}
 	}
 }

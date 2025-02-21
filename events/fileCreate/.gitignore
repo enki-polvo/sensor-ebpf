@@ -1,5 +1,6 @@
+vmlinux.h
 bpf_bpfeb*
 bpf_bpfel*
 filecreate_bpfeb*
 filecreate_bpfel*
-fileCreate      # binary output
+*.out      # binary output

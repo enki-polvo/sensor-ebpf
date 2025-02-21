@@ -1,1 +1,3 @@
+*.out
 vmlinux.h
+sensor-ebpf
