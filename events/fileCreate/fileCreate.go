@@ -1,3 +1,4 @@
+// sensors/fileCreate/fileCreate.c
 package fileCreate
 
 import (
@@ -13,8 +14,8 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 )
 
-// fileCreateEvent matches the struct file_create_event in our BPF program.
-type fileCreateEvent struct {
+// FileCreateEvent matches the struct file_create_event in our BPF program.
+type FileCreateEvent struct {
 	UID       uint32
 	PID       uint32
 	Filename  [256]byte
@@ -23,8 +24,9 @@ type fileCreateEvent struct {
 	EventType uint32 // 1: open, 2: openat
 }
 
-// Run starts the fileCreate event collector and runs until the context is cancelled.
-func Run(ctx context.Context) error {
+// Run starts the fileCreate event collector and sends events over the provided channel.
+// It closes the channel when exiting.
+func Run(ctx context.Context, events chan<- FileCreateEvent) error {
 	// Remove resource limits.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return fmt.Errorf("failed to remove memlock limit: %w", err)
@@ -58,8 +60,10 @@ func Run(ctx context.Context) error {
 	defer rd.Close()
 
 	log.Println("Listening for file create events (open and openat).")
+	// Ensure the channel gets closed once Run exits.
+	defer close(events)
 
-	var event fileCreateEvent
+	var event FileCreateEvent
 	for {
 		select {
 		case <-ctx.Done():
@@ -84,15 +88,13 @@ func Run(ctx context.Context) error {
 				continue
 			}
 
-			// Convert the filename by trimming any trailing nulls.
-			filename := string(event.Filename[:])
-			syscallName := "open"
-			if event.EventType == 2 {
-				syscallName = "openat"
+			// Instead of printing, send the event over the channel.
+			select {
+			case events <- event:
+				// Sent successfully.
+			case <-ctx.Done():
+				return nil
 			}
-
-			fmt.Printf("PID: %d, UID: %d, Syscall: %s, Filename: %s, Flags: %d, Mode: %d\n",
-				event.PID, event.UID, syscallName, filename, event.Flags, event.Mode)
 		}
 	}
 }
