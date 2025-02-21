@@ -13,8 +13,6 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags "-O2 -g -Wall" bpf fileCreate.c
-
 // fileCreateEvent matches the struct file_create_event in our BPF program.
 type fileCreateEvent struct {
 	UID       uint32
@@ -33,8 +31,8 @@ func Run(ctx context.Context) error {
 	}
 
 	// Load pre-compiled BPF objects.
-	objs := bpfObjects{}
-	if err := loadBpfObjects(&objs, nil); err != nil {
+	objs := fileCreateObjects{}
+	if err := loadFileCreateObjects(&objs, nil); err != nil {
 		return fmt.Errorf("loading objects: %w", err)
 	}
 	defer objs.Close()

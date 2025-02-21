@@ -1,4 +1,4 @@
-// go:build ignore
+//go:build ignore
 #define __TARGET_ARCH_x86
 #include "vmlinux.h"
 #include <bpf/bpf_core_read.h>
