@@ -1,3 +1,5 @@
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags "-O2 -g -Wall" bpf fileCreate.c -- -I/path/to/vmlinux/headers
+
 package main
 
 import (
@@ -14,8 +16,6 @@ import (
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
 )
-
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -cflags "-O2 -g -Wall" bpf fileCreate.c -- -I/path/to/vmlinux/headers
 
 // fileCreateEvent matches the struct file_create_event in our BPF program.
 type fileCreateEvent struct {

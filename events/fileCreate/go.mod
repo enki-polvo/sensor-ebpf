@@ -1,4 +1,4 @@
-module fileCreate
+module sensor-ebpf/fileCreate
 
 go 1.24.0
 
