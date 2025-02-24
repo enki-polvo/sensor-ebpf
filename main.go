@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"sensor-ebpf/events/fileCreate"
-	"sensor-ebpf/utility"
+	// "sensor-ebpf/utility"
 )
 
 func main() {
@@ -38,12 +38,16 @@ func main() {
 	go func() {
 		for event := range fileCreateEventCh {
 			filename := string(event.Filename[:])
-			processName, _ := utility.GetProcessName(event.PID)
-			username, _ := utility.GetUsername(event.UID)
+			// processName, _ := utility.GetProcessName(event.PID)
+			// username, _ := utility.GetUsername(event.UID)
 			// TODO: Use povlo-logger to uniformly manage the log events.
-			fmt.Printf("PID: %d(%s), UID: %d(%s), Filename: %s, Flags: %d, Mode: %d\n",
-				event.PID, processName, event.UID, username,
-				filename, event.Flags, event.Mode)
+			// TODO: Implement GetProcessName and GetUsername functions without accessing the filesystem.
+			fmt.Printf("PID: %d, UID: %d, Filename: %s, Flags: %d, Mode: %d\n",
+				event.PID, event.UID, filename, event.Flags, event.Mode)
+
+			// fmt.Printf("PID: %d(%s), UID: %d(%s), Filename: %s, Flags: %d, Mode: %d\n",
+			// 	event.PID, processName, event.UID, username,
+			// 	filename, event.Flags, event.Mode)
 		}
 	}()
 
