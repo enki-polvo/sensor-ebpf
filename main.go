@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"sensor-ebpf/events/fileCreate"
-	"sensor-ebpf/events/vfsCreate"
+	"sensor-ebpf/events/vfsOpen"
 )
 
 func main() {
@@ -22,7 +22,7 @@ func main() {
 
 	// Create buffered channels for events.
 	sysFileCreateEventCh := make(chan fileCreate.FileCreateEvent, 10)
-	kprobeFileCreateEventCh := make(chan vfsCreate.FileCreateEvent, 10)
+	kprobeVfsOpenEventCh := make(chan vfsOpen.FileCreateEvent, 10)
 
 	// Start the sysFileCreate event collector.
 	go func() {
@@ -31,30 +31,28 @@ func main() {
 		}
 	}()
 
-	// Start the vfsCreate event collector.
+	// Start the vfsOpen event collector.
 	go func() {
-		if err := vfsCreate.Run(ctx, kprobeFileCreateEventCh); err != nil {
-			log.Fatalf("vfsCreate event collector error: %v", err)
+		if err := vfsOpen.Run(ctx, kprobeVfsOpenEventCh); err != nil {
+			log.Fatalf("vfsOpen event collector error: %v", err)
 		}
 	}()
 
-	// Start a goroutine to process sysFileCreate events.
+	// Process sysFileCreate events.
 	go func() {
 		for event := range sysFileCreateEventCh {
-			// Trim the null bytes from the filename.
 			filename := string(bytes.Trim(event.Filename[:], "\x00"))
 			fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filename: %s, Flags: %d, Mode: %d\n",
 				event.PID, event.UID, filename, event.Flags, event.Mode)
 		}
 	}()
 
-	// Start a goroutine to process vfsCreate events.
+	// Process vfsOpen events.
 	go func() {
-		for event := range kprobeFileCreateEventCh {
-			fmt.Println("There is an event")
+		for event := range kprobeVfsOpenEventCh {
 			filename := string(bytes.Trim(event.Filename[:], "\x00"))
-			fmt.Printf("[vfsCreate] PID: %d, UID: %d, Filename: %s, Flags: %d, Mode: %d\n",
-				event.PID, event.UID, filename, event.Flags, event.Mode)
+			fmt.Printf("[vfsOpen] PID: %d, UID: %d, Filename: %s\n",
+				event.PID, event.UID, filename)
 		}
 	}()
 
@@ -63,12 +61,10 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	fmt.Println("Event collectors running. Press Ctrl+C to exit.")
-
-	// Block until a termination signal is received.
 	<-sigCh
 	fmt.Println("Termination signal received. Shutting down...")
 	cancel()
 
-	// Allow a moment for collectors to exit gracefully.
+	// Allow time for collectors to exit gracefully.
 	time.Sleep(1 * time.Second)
 }

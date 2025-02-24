@@ -1,5 +1,5 @@
-// sensors/vfsCreate/vfsCreate.go
-package vfsCreate
+// sensors/vfsOpen/vfsOpen.go
+package vfsOpen
 
 import (
 	"bytes"
@@ -14,55 +14,51 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 )
 
-// FileCreateEvent matches the struct file_create_event in our BPF program.
+// FileCreateEvent matches the simplified struct file_create_event from our BPF program.
 type FileCreateEvent struct {
 	UID      uint32
 	PID      uint32
 	Filename [256]byte
-	Flags    int32
-	Mode     uint32
 }
 
-// Run starts the vfs_create kprobe, reads events from the ring buffer, and sends them over the provided channel.
+// Run starts the vfs_open kprobe, reads events from the ring buffer, and sends them over the provided channel.
 func Run(ctx context.Context, events chan<- FileCreateEvent) error {
-	// Remove resource limits so we can load our BPF objects.
+	// Remove memlock limits.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		return fmt.Errorf("failed to remove memlock: %w", err)
 	}
 
-	// Load pre-compiled BPF objects.
-	objs := vfsCreateObjects{}
-	if err := loadVfsCreateObjects(&objs, nil); err != nil {
+	// Load pre-compiled BPF objects. This assumes you've generated them using bpf2go.
+	objs := vfsOpenObjects{}
+	if err := loadVfsOpenObjects(&objs, nil); err != nil {
 		return fmt.Errorf("loading objects: %w", err)
 	}
 	defer objs.Close()
 
-	// Attach the kprobe to vfs_create.
-	kp, err := link.Kprobe("vfs_create", objs.VfsCreate, nil)
+	// Attach the kprobe to vfs_open.
+	kp, err := link.Kprobe("vfs_open", objs.VfsOpen, nil)
 	if err != nil {
 		return fmt.Errorf("failed to attach kprobe: %w", err)
 	}
 	defer kp.Close()
 
 	// Open a ring buffer reader on the map.
-	rd, err := ringbuf.NewReader(objs.VfsCreateEventMap)
+	rd, err := ringbuf.NewReader(objs.VfsOpenEventMap)
 	if err != nil {
 		return fmt.Errorf("failed to open ring buffer: %w", err)
 	}
 	defer rd.Close()
 
-	log.Println("Listening for vfs_create events...")
-	// Close the event channel when exiting.
+	log.Println("Listening for vfs_open events...")
 	defer close(events)
 
 	var event FileCreateEvent
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("vfsCreate event collector stopping")
+			log.Println("vfsOpen event collector stopping")
 			return nil
 		default:
-			// Read the next event from the ring buffer.
 			record, err := rd.Read()
 			if err != nil {
 				if errors.Is(err, ringbuf.ErrClosed) {
@@ -73,17 +69,13 @@ func Run(ctx context.Context, events chan<- FileCreateEvent) error {
 				continue
 			}
 
-			// Parse the event.
-			err = binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event)
-			if err != nil {
+			if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
 				log.Printf("error parsing event: %v", err)
 				continue
 			}
 
-			// Send the event over the channel.
 			select {
 			case events <- event:
-				// Sent successfully.
 			case <-ctx.Done():
 				return nil
 			}
