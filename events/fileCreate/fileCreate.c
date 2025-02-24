@@ -5,6 +5,8 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
+char LICENSE[] SEC("license") __attribute__((weak)) = "GPL";
+
 // Tracepoint format for sys_enter_openat.
 struct tracepoint_syscalls_sys_enter_openat {
     __u16 common_type;         // offset: 0, size: 2
@@ -86,5 +88,3 @@ int trace_sys_enter_open(struct tracepoint_syscalls_sys_enter_open *args) {
     bpf_ringbuf_submit(e, 0);
     return 0;
 }
-
-char LICENSE[] SEC("license") = "GPL";

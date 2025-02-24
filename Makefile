@@ -27,6 +27,7 @@ $(PROJECTS):
 	@echo "$(GREEN_BOLD)==== Finished building: $@ ====$(RESET)"
 
 
+
 # Clean up binaries and generated files matching *_bpfeb.* and *_bpfel.*
 clean:
 	@echo "$(GREEN_BOLD)==== Cleaning up generated binaries and artifacts ====$(RESET)"

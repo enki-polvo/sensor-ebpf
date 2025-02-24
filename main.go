@@ -1,6 +1,8 @@
+// main.go
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -10,7 +12,7 @@ import (
 	"time"
 
 	"sensor-ebpf/events/fileCreate"
-	// "sensor-ebpf/utility"
+	"sensor-ebpf/events/vfsCreate"
 )
 
 func main() {
@@ -18,15 +20,41 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create a buffered channel for events.
-	// TODO: Generalize the event channel(s) so that we can use a single collector for multiple event types.
-	//       (Or utilize multiple collectors, one for each event type.)
-	fileCreateEventCh := make(chan fileCreate.FileCreateEvent, 10)
+	// Create buffered channels for events.
+	sysFileCreateEventCh := make(chan fileCreate.FileCreateEvent, 10)
+	kprobeFileCreateEventCh := make(chan vfsCreate.FileCreateEvent, 10)
 
-	// Start the fileCreate event collector.
+	// Start the sysFileCreate event collector.
 	go func() {
-		if err := fileCreate.Run(ctx, fileCreateEventCh); err != nil {
+		if err := fileCreate.Run(ctx, sysFileCreateEventCh); err != nil {
 			log.Fatalf("fileCreate event collector error: %v", err)
+		}
+	}()
+
+	// Start the vfsCreate event collector.
+	go func() {
+		if err := vfsCreate.Run(ctx, kprobeFileCreateEventCh); err != nil {
+			log.Fatalf("vfsCreate event collector error: %v", err)
+		}
+	}()
+
+	// Start a goroutine to process sysFileCreate events.
+	go func() {
+		for event := range sysFileCreateEventCh {
+			// Trim the null bytes from the filename.
+			filename := string(bytes.Trim(event.Filename[:], "\x00"))
+			fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filename: %s, Flags: %d, Mode: %d\n",
+				event.PID, event.UID, filename, event.Flags, event.Mode)
+		}
+	}()
+
+	// Start a goroutine to process vfsCreate events.
+	go func() {
+		for event := range kprobeFileCreateEventCh {
+			fmt.Println("There is an event")
+			filename := string(bytes.Trim(event.Filename[:], "\x00"))
+			fmt.Printf("[vfsCreate] PID: %d, UID: %d, Filename: %s, Flags: %d, Mode: %d\n",
+				event.PID, event.UID, filename, event.Flags, event.Mode)
 		}
 	}()
 
@@ -34,25 +62,9 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start a goroutine to process and print events.
-	go func() {
-		for event := range fileCreateEventCh {
-			filename := string(event.Filename[:])
-			// processName, _ := utility.GetProcessName(event.PID)
-			// username, _ := utility.GetUsername(event.UID)
-			// TODO: Use povlo-logger to uniformly manage the log events.
-			// TODO: Implement GetProcessName and GetUsername functions without accessing the filesystem.
-			fmt.Printf("PID: %d, UID: %d, Filename: %s, Flags: %d, Mode: %d\n",
-				event.PID, event.UID, filename, event.Flags, event.Mode)
-
-			// fmt.Printf("PID: %d(%s), UID: %d(%s), Filename: %s, Flags: %d, Mode: %d\n",
-			// 	event.PID, processName, event.UID, username,
-			// 	filename, event.Flags, event.Mode)
-		}
-	}()
-
 	fmt.Println("Event collectors running. Press Ctrl+C to exit.")
 
+	// Block until a termination signal is received.
 	<-sigCh
 	fmt.Println("Termination signal received. Shutting down...")
 	cancel()
