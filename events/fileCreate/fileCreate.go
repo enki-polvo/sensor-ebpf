@@ -16,12 +16,11 @@ import (
 
 // FileCreateEvent matches the struct file_create_event in our BPF program.
 type FileCreateEvent struct {
-	UID       uint32
-	PID       uint32
-	Filename  [256]byte
-	Flags     int32
-	Mode      uint32
-	EventType uint32 // 1: open, 2: openat
+	UID      uint32
+	PID      uint32
+	Filename [256]byte
+	Flags    int32
+	Mode     uint32
 }
 
 // Run starts the fileCreate event collector and sends events over the provided channel.

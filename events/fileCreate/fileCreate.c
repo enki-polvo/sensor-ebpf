@@ -1,4 +1,4 @@
-//go:build ignore
+// go:build ignore
 #define __TARGET_ARCH_x86
 #include "vmlinux.h"
 #include <bpf/bpf_core_read.h>
@@ -38,7 +38,6 @@ struct file_create_event {
     char filename[256];
     long flags;
     unsigned long mode;
-    __u32 event_type; // 1: open, 2: openat
 } __attribute__((packed));
 
 struct {
@@ -62,7 +61,6 @@ int trace_sys_enter_openat(struct tracepoint_syscalls_sys_enter_openat *args) {
     bpf_probe_read_user_str(e->filename, sizeof(e->filename), args->filename);
     e->flags = args->flags;
     e->mode = args->mode;
-    e->event_type = 2; // Mark as openat
 
     bpf_ringbuf_submit(e, 0);
     return 0;
@@ -84,7 +82,6 @@ int trace_sys_enter_open(struct tracepoint_syscalls_sys_enter_open *args) {
     bpf_probe_read_user_str(e->filename, sizeof(e->filename), args->filename);
     e->flags = args->flags;
     e->mode = args->mode;
-    e->event_type = 1; // Mark as open
 
     bpf_ringbuf_submit(e, 0);
     return 0;

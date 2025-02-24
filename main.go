@@ -20,11 +20,11 @@ func main() {
 	// Create a buffered channel for events.
 	// TODO: Generalize the event channel(s) so that we can use a single collector for multiple event types.
 	//       (Or utilize multiple collectors, one for each event type.)
-	eventCh := make(chan fileCreate.FileCreateEvent, 10)
+	fileCreateEventCh := make(chan fileCreate.FileCreateEvent, 10)
 
 	// Start the fileCreate event collector.
 	go func() {
-		if err := fileCreate.Run(ctx, eventCh); err != nil {
+		if err := fileCreate.Run(ctx, fileCreateEventCh); err != nil {
 			log.Fatalf("fileCreate event collector error: %v", err)
 		}
 	}()
@@ -35,16 +35,11 @@ func main() {
 
 	// Start a goroutine to process and print events.
 	go func() {
-		for event := range eventCh {
-			syscallName := "open"
-			if event.EventType == 2 {
-				syscallName = "openat"
-			}
-			// Trim any trailing nulls from the filename.
+		for event := range fileCreateEventCh {
 			filename := string(event.Filename[:])
 			// TODO: Use povlo-logger to uniformly manage the log events.
-			fmt.Printf("PID: %d, UID: %d, Syscall: %s, Filename: %s, Flags: %d, Mode: %d\n",
-				event.PID, event.UID, syscallName, filename, event.Flags, event.Mode)
+			fmt.Printf("PID: %d, UID: %d, Filename: %s, Flags: %d, Mode: %d\n",
+				event.PID, event.UID, filename, event.Flags, event.Mode)
 		}
 	}()
 
