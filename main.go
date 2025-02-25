@@ -2,7 +2,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -16,13 +15,13 @@ import (
 )
 
 func main() {
-	// Create a cancellable context.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create buffered channels for events.
+	// Channel for sysFileCreate events (unchanged).
 	sysFileCreateEventCh := make(chan fileCreate.FileCreateEvent, 10)
-	kprobeVfsOpenEventCh := make(chan vfsOpen.FileCreateEvent, 10)
+	// New channel for fully reassembled vfsOpen events.
+	kprobeVfsOpenEventCh := make(chan vfsOpen.VfsOpenFullEvent, 10)
 
 	// Start the sysFileCreate event collector.
 	go func() {
@@ -41,22 +40,20 @@ func main() {
 	// Process sysFileCreate events.
 	go func() {
 		for event := range sysFileCreateEventCh {
-			filepath := string(bytes.Trim(event.Filepath[:], "\x00"))
+			filepath := string(event.Filepath[:])
 			fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
 				event.PID, event.UID, filepath, event.Flags, event.Mode)
 		}
 	}()
 
-	// Process vfsOpen events.
+	// Process vfsOpen events, printing the full reassembled file path.
 	go func() {
 		for event := range kprobeVfsOpenEventCh {
-			filepath := string(bytes.Trim(event.Filepath[:], "\x00"))
-			fmt.Printf("[vfsOpen] PID: %d, UID: %d, Filepath: %s\n",
-				event.PID, event.UID, filepath)
+			fmt.Printf("[vfsOpen] PID: %d, UID: %d, Full Filepath: %s\n",
+				event.PID, event.UID, event.FullPath)
 		}
 	}()
 
-	// Listen for termination signals.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
