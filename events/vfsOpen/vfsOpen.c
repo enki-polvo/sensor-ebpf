@@ -31,7 +31,8 @@ int BPF_KPROBE(vfs_open, const struct path *path, struct file *file) {
     int i;
 
     // Read the initial dentry pointer from path->dentry.
-    if (bpf_probe_read_kernel(&dentry, sizeof(dentry), &path->dentry) != 0) {
+    if (bpf_probe_read_kernel(&dentry, sizeof(struct dentry), &path->dentry) !=
+        0) {
         return 0;
     }
 
@@ -67,8 +68,8 @@ int BPF_KPROBE(vfs_open, const struct path *path, struct file *file) {
         bpf_ringbuf_submit(e, 0);
 
         // Move to the parent dentry.
-        if (bpf_probe_read_kernel(&dentry, sizeof(dentry), &dentry->d_parent) !=
-            0) {
+        if (bpf_probe_read_kernel(&dentry, sizeof(struct dentry),
+                                  &dentry->d_parent) != 0) {
             break;
         }
     }
