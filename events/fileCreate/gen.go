@@ -1,3 +1,4 @@
+// events/fileCreate/gen.go
 package fileCreate
 
 import (

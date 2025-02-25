@@ -1,4 +1,4 @@
-// sensors/vfsOpen/vfsOpen.go
+// events/vfsOpen/vfsOpen.go
 package vfsOpen
 
 import (

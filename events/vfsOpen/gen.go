@@ -1,3 +1,4 @@
+// events/vfsOpen/gen.co
 package vfsOpen
 
 import (

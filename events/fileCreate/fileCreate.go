@@ -1,4 +1,4 @@
-// sensors/fileCreate/fileCreate.c
+// events/fileCreate/fileCreate.c
 package fileCreate
 
 import (
