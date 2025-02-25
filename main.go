@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"sensor-ebpf/events/fileCreate"
+	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/vfsOpen"
 )
 
@@ -18,20 +19,30 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Channel for sysFileCreate events (unchanged).
+	// Channels listening to the events.
 	sysFileCreateEventCh := make(chan fileCreate.FileCreateEvent, 10)
-	// New channel for fully reassembled vfsOpen events.
+	sysProcessCreateEventCh := make(chan processCreate.ProcessCreateEvent, 10)
 	kprobeVfsOpenEventCh := make(chan vfsOpen.VfsOpenFullEvent, 10)
 
 	// Start the sysFileCreate event collector.
 	go func() {
+		log.Println("Starting fileCreate event collector")
 		if err := fileCreate.Run(ctx, sysFileCreateEventCh); err != nil {
 			log.Fatalf("fileCreate event collector error: %v", err)
 		}
 	}()
 
+	// Start the sysProcessCreate event collector.
+	go func() {
+		log.Println("Starting processCreate event collector")
+		if err := processCreate.Run(ctx, sysProcessCreateEventCh); err != nil {
+			log.Fatalf("processCreate event collector error: %v", err)
+		}
+	}()
+
 	// Start the vfsOpen event collector.
 	go func() {
+		log.Println("Starting vfsOpen event collector")
 		if err := vfsOpen.Run(ctx, kprobeVfsOpenEventCh); err != nil {
 			log.Fatalf("vfsOpen event collector error: %v", err)
 		}
@@ -43,6 +54,14 @@ func main() {
 			filepath := string(event.Filepath[:])
 			fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
 				event.PID, event.UID, filepath, event.Flags, event.Mode)
+		}
+	}()
+
+	// Process sysProcessCreate events.
+	go func() {
+		for event := range sysProcessCreateEventCh {
+			fmt.Printf("[sysProcessCreate] PID: %d, UID: %d, Command: %s, Filename: %s, Argc: %d, Envc: %d\n",
+				event.PID, event.UID, event.Command, event.Filename, event.Argc, event.Envc)
 		}
 	}()
 
