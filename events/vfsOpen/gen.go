@@ -1,4 +1,4 @@
-// events/vfsOpen/gen.co
+// events/vfsOpen/gen.go
 package vfsOpen
 
 import (
