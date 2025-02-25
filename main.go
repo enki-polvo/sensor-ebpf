@@ -41,18 +41,18 @@ func main() {
 	// Process sysFileCreate events.
 	go func() {
 		for event := range sysFileCreateEventCh {
-			filename := string(bytes.Trim(event.Filename[:], "\x00"))
-			fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filename: %s, Flags: %d, Mode: %d\n",
-				event.PID, event.UID, filename, event.Flags, event.Mode)
+			filepath := string(bytes.Trim(event.Filepath[:], "\x00"))
+			fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
+				event.PID, event.UID, filepath, event.Flags, event.Mode)
 		}
 	}()
 
 	// Process vfsOpen events.
 	go func() {
 		for event := range kprobeVfsOpenEventCh {
-			filename := string(bytes.Trim(event.Filename[:], "\x00"))
-			fmt.Printf("[vfsOpen] PID: %d, UID: %d, Filename: %s\n",
-				event.PID, event.UID, filename)
+			filepath := string(bytes.Trim(event.Filepath[:], "\x00"))
+			fmt.Printf("[vfsOpen] PID: %d, UID: %d, Filepath: %s\n",
+				event.PID, event.UID, filepath)
 		}
 	}()
 

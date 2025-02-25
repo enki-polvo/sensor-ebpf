@@ -18,7 +18,7 @@ import (
 type FileCreateEvent struct {
 	UID      uint32
 	PID      uint32
-	Filename [256]byte
+	Filepath [512]byte
 	Flags    int32
 	Mode     uint32
 }

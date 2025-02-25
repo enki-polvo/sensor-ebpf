@@ -38,7 +38,7 @@ struct tracepoint_syscalls_sys_enter_open {
 struct file_create_event {
     __u32 uid;
     __u32 pid;
-    char filename[256];
+    char filepath[512];
     long flags;
     unsigned long mode;
 } __attribute__((packed));
@@ -60,8 +60,8 @@ int trace_sys_enter_openat(struct tracepoint_syscalls_sys_enter_openat *args) {
 
     e->pid = bpf_get_current_pid_tgid() >> 32;
     e->uid = bpf_get_current_uid_gid() >> 32;
-    // Copy the filename from user space.
-    bpf_probe_read_user_str(e->filename, sizeof(e->filename), args->filename);
+    // Copy the filepath from user space.
+    bpf_probe_read_user_str(e->filepath, sizeof(e->filepath), args->filename);
     e->flags = args->flags;
     e->mode = args->mode;
 
@@ -81,8 +81,8 @@ int trace_sys_enter_open(struct tracepoint_syscalls_sys_enter_open *args) {
 
     e->pid = bpf_get_current_pid_tgid() >> 32;
     e->uid = bpf_get_current_uid_gid() >> 32;
-    // Copy the filename from user space.
-    bpf_probe_read_user_str(e->filename, sizeof(e->filename), args->filename);
+    // Copy the filepath from user space.
+    bpf_probe_read_user_str(e->filepath, sizeof(e->filepath), args->filename);
     e->flags = args->flags;
     e->mode = args->mode;
 

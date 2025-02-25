@@ -18,7 +18,7 @@ import (
 type FileCreateEvent struct {
 	UID      uint32
 	PID      uint32
-	Filename [256]byte
+	Filepath [512]byte
 }
 
 // Run starts the vfs_open kprobe, reads events from the ring buffer, and sends them over the provided channel.
