@@ -12,6 +12,7 @@ import (
 
 	// "sensor-ebpf/events/fileCreate"
 	"sensor-ebpf/events/processCreate"
+	"sensor-ebpf/events/processTerminate"
 	"sensor-ebpf/events/vfsOpen"
 )
 
@@ -70,8 +71,13 @@ func main() {
 
 			argsString := parameterStrConcatenator(event.Args)
 			// envsString := parameterStrConcatenator(event.Envs)
-			fmt.Printf("[sysProcessCreate] PID: %d, UID: %d, Command: %s, Filename: %s, Argv: %s\n",
-				event.PID, event.UID, event.Command, event.Filename, argsString)
+			fmt.Printf("[sysProcessCreate] PID: %d, PPID: %d, TGID: %d, UID: %d, Command: %s, Filename: %s, Argv: %s\n",
+				event.PID, event.PPID, event.TGID, event.UID, event.Command, event.Filename, argsString)
+		})
+
+	startCollector(ctx, "processTerminate", processTerminate.Run,
+		func(event processTerminate.ProcessTerminateEvent) {
+			fmt.Printf("[sysProcessTerminate] PID: %d, UID: %d, Ret: %d\n", event.PID, event.UID, event.Ret)
 		})
 
 	startCollector(ctx, "vfsOpen", vfsOpen.Run,
