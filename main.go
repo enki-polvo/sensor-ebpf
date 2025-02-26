@@ -59,8 +59,19 @@ func main() {
 
 	startCollector(ctx, "processCreate", processCreate.Run,
 		func(event processCreate.ProcessCreateEvent) {
-			fmt.Printf("[sysProcessCreate] PID: %d, UID: %d, Command: %s, Filename: %s, Argc: %d, Envc: %d\n",
-				event.PID, event.UID, event.Command, event.Filename, event.Argc, event.Envc)
+			// Concatenate the parameters into a single string.
+			parameterStrConcatenator := func(parameters [10][256]byte) string {
+				result := ""
+				for _, param := range parameters {
+					result += fmt.Sprintf("%s ", string(param[:]))
+				}
+				return result
+			}
+
+			argsString := parameterStrConcatenator(event.Args)
+			// envsString := parameterStrConcatenator(event.Envs)
+			fmt.Printf("[sysProcessCreate] PID: %d, UID: %d, Command: %s, Filename: %s, Argv: %s\n",
+				event.PID, event.UID, event.Command, event.Filename, argsString)
 		})
 
 	startCollector(ctx, "vfsOpen", vfsOpen.Run,
