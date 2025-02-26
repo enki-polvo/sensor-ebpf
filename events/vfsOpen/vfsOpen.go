@@ -20,6 +20,7 @@ import (
 type FileCreateEvent struct {
 	UID             uint32
 	PID             uint32
+	Flags           uint32
 	FilepathSegment [512]byte
 	FirstSegment    bool
 }
@@ -28,9 +29,11 @@ type FileCreateEvent struct {
 // Since Go program is outside of the kernel, we can reassemble the file path
 // without the stack size limit.
 type VfsOpenFullEvent struct {
-	UID      uint32
-	PID      uint32
-	FullPath string
+	UID                 uint32
+	PID                 uint32
+	Flags               uint32
+	FlagsInterpretation []string
+	FullPath            string
 }
 
 // Run starts the vfs_open kprobe, reads events from the ring buffer,
@@ -65,7 +68,7 @@ func Run(ctx context.Context, events chan<- VfsOpenFullEvent) error {
 
 	// segmentChain accumulates the file path segments.
 	var segmentChain []string
-	var lastUID, lastPID uint32
+	var lastUID, lastPID, lastFlags uint32
 
 	// Close the ring buffer reader and flush any remaining segments.
 	flushChain := func() {
@@ -74,9 +77,11 @@ func Run(ctx context.Context, events chan<- VfsOpenFullEvent) error {
 			// We reaseemble the path and send it to the user space immediately.
 			fullPath := reassemblePath(segmentChain)
 			events <- VfsOpenFullEvent{
-				UID:      lastUID,
-				PID:      lastPID,
-				FullPath: fullPath,
+				UID:                 lastUID,
+				PID:                 lastPID,
+				FullPath:            fullPath,
+				Flags:               lastFlags,                     // Numerical flags
+				FlagsInterpretation: InterpretFileFlags(lastFlags), // Interpretation of flags (stringified)
 			}
 			// Since the segments are sent to the user space, we need to clear the segmentChain.
 			segmentChain = segmentChain[:0]
@@ -114,6 +119,7 @@ func Run(ctx context.Context, events chan<- VfsOpenFullEvent) error {
 			segmentChain = append(segmentChain, seg)
 			lastUID = event.UID
 			lastPID = event.PID
+			lastFlags = event.Flags
 		}
 	}
 }

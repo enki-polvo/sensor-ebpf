@@ -82,9 +82,8 @@ func main() {
 
 	startCollector(ctx, "vfsOpen", vfsOpen.Run,
 		func(event vfsOpen.VfsOpenFullEvent) {
-			// NOTE: We temporarily disable the vfsOpen collector because it is proved to be working
-			// fmt.Printf("[vfsOpen] PID: %d, UID: %d, Full Filepath: %s\n",
-			// 	event.PID, event.UID, event.FullPath)
+			// fmt.Printf("[vfsOpen] PID: %d, UID: %d, Full Filepath: %s, Flags: %O(%v)\n",
+			// 	event.PID, event.UID, event.FullPath, event.Flags, event.FlagsInterpretation)
 		})
 
 	// Wait for termination signal.

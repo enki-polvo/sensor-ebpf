@@ -4,6 +4,7 @@
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+#include <limits.h>
 
 // Use a weak license definition to avoid duplicate symbol issues.
 char LICENSE[] SEC("license") __attribute__((weak)) = "GPL";
@@ -12,6 +13,7 @@ char LICENSE[] SEC("license") __attribute__((weak)) = "GPL";
 struct file_create_event {
     __u32 uid;
     __u32 pid;
+    __u32 flags;
     char filepathSegment[512];
     bool firstSegment; // True if this event is
                        // the first segment for a new path.
@@ -73,6 +75,13 @@ int BPF_KPROBE(vfs_open, const struct path *path, struct file *file) {
         if (e->filepathSegment[0] == '/' && e->filepathSegment[1] == '\0') {
             bpf_ringbuf_discard(e, 0);
             break;
+        }
+
+        // Get the current file's flag
+        if (bpf_probe_read_kernel(&e->flags, sizeof(e->flags),
+                                  &file->f_flags) != 0) {
+            bpf_ringbuf_discard(e, 0);
+            return 0;
         }
 
         bpf_ringbuf_submit(e, 0);
