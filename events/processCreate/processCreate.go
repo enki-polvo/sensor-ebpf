@@ -18,6 +18,7 @@ type ProcessCreateEvent struct {
 	UID      uint32
 	PID      uint32
 	PPID     uint32
+	TGID     uint32
 	Command  [16]byte
 	Filename [256]byte
 	Argc     uint32

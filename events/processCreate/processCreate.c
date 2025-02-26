@@ -45,6 +45,7 @@ struct exec_event {
     __u32 uid;
     __u32 pid;
     __u32 ppid;
+    __u32 tgid;
     char command[16];
     char filename[256];
     __u32 argc;
@@ -87,17 +88,20 @@ int trace_sys_enter_execve(struct tracepoint_syscalls_sys_enter_execve *ctx) {
     filename = ctx->filename;
     bpf_probe_read_user_str(&e->filename, sizeof(e->filename), filename);
 
-    // Obtain this task's PPID(Parent PID)
+    // Obtain this task's PPID(Parent PID) and TGID(Thread Group ID)
     struct task_struct *task;
     struct task_struct *real_parent_task;
     __u64 ppid;
+    __u64 tgid;
 
     task = (struct task_struct *)bpf_get_current_task();
 
     bpf_probe_read(&real_parent_task, sizeof(real_parent_task), // NOLINT
                    &task->real_parent);
     bpf_probe_read(&ppid, sizeof(ppid), &real_parent_task->pid);
+    bpf_probe_read(&tgid, sizeof(tgid), &task->tgid);
     e->ppid = ppid;
+    e->tgid = tgid;
 
     // Process argv using ctx->argv.
     argv = ctx->argv;
@@ -171,13 +175,16 @@ int trace_sys_enter_execveat(
     struct task_struct *task;
     struct task_struct *real_parent_task;
     __u64 ppid;
+    __u64 tgid;
 
     task = (struct task_struct *)bpf_get_current_task();
 
     bpf_probe_read(&real_parent_task, sizeof(real_parent_task), // NOLINT
                    &task->real_parent);
     bpf_probe_read(&ppid, sizeof(ppid), &real_parent_task->pid);
+    bpf_probe_read(&tgid, sizeof(tgid), &task->tgid);
     e->ppid = ppid;
+    e->tgid = tgid;
 
     // Process argv.
     argv = ctx->argv;
