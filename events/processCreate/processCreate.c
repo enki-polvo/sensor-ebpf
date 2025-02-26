@@ -1,6 +1,7 @@
 // events/exec/exec_trace.c
 // go:build ignore
 #define __TARGET_ARCH_x86
+
 #include "vmlinux.h"
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
@@ -43,6 +44,7 @@ struct tracepoint_syscalls_sys_enter_execveat {
 struct exec_event {
     __u32 uid;
     __u32 pid;
+    __u32 ppid;
     char command[16];
     char filename[256];
     __u32 argc;
@@ -84,6 +86,18 @@ int trace_sys_enter_execve(struct tracepoint_syscalls_sys_enter_execve *ctx) {
     // Correctly read the filename using the filename field.
     filename = ctx->filename;
     bpf_probe_read_user_str(&e->filename, sizeof(e->filename), filename);
+
+    // Obtain this task's PPID(Parent PID)
+    struct task_struct *task;
+    struct task_struct *real_parent_task;
+    __u64 ppid;
+
+    task = (struct task_struct *)bpf_get_current_task();
+
+    bpf_probe_read(&real_parent_task, sizeof(real_parent_task), // NOLINT
+                   &task->real_parent);
+    bpf_probe_read(&ppid, sizeof(ppid), &real_parent_task->pid);
+    e->ppid = ppid;
 
     // Process argv using ctx->argv.
     argv = ctx->argv;
@@ -149,9 +163,21 @@ int trace_sys_enter_execveat(
     e->pid = bpf_get_current_pid_tgid() >> 32;
     bpf_get_current_comm(&e->command, sizeof(e->command));
 
-    // Read filename from execveat's tracepoint.
+    // Correctly read the filename using the filename field.
     filename = ctx->filename;
     bpf_probe_read_user_str(&e->filename, sizeof(e->filename), filename);
+
+    // Obtain this task's PPID(Parent PID)
+    struct task_struct *task;
+    struct task_struct *real_parent_task;
+    __u64 ppid;
+
+    task = (struct task_struct *)bpf_get_current_task();
+
+    bpf_probe_read(&real_parent_task, sizeof(real_parent_task), // NOLINT
+                   &task->real_parent);
+    bpf_probe_read(&ppid, sizeof(ppid), &real_parent_task->pid);
+    e->ppid = ppid;
 
     // Process argv.
     argv = ctx->argv;
