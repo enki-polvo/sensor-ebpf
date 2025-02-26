@@ -1,4 +1,4 @@
-// events/fileCreate/fileCreate.c
+// events/fileCreate/fileCreate.go
 package fileCreate
 
 import (

@@ -60,6 +60,10 @@ int trace_sys_enter_openat(struct tracepoint_syscalls_sys_enter_openat *args) {
 
     e->pid = bpf_get_current_pid_tgid() >> 32;
     e->uid = bpf_get_current_uid_gid() >> 32;
+
+    // Get flag of the file.
+    struct file *currentFile;
+
     // Copy the filepath from user space.
     bpf_probe_read_user_str(e->filepath, sizeof(e->filepath), args->filename);
     e->flags = args->flags;
@@ -81,6 +85,7 @@ int trace_sys_enter_open(struct tracepoint_syscalls_sys_enter_open *args) {
 
     e->pid = bpf_get_current_pid_tgid() >> 32;
     e->uid = bpf_get_current_uid_gid() >> 32;
+
     // Copy the filepath from user space.
     bpf_probe_read_user_str(e->filepath, sizeof(e->filepath), args->filename);
     e->flags = args->flags;
