@@ -10,77 +10,73 @@ import (
 	"syscall"
 	"time"
 
-	"sensor-ebpf/events/fileCreate"
+	// "sensor-ebpf/events/fileCreate"
 	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/vfsOpen"
 )
+
+// startCollector is a generic helper function that sets up the event collector and processor.
+// name: used for logging.
+// runner: the event collector function (e.g., fileCreate.Run).
+// handler: the function to process each event.
+func startCollector[T any](
+	ctx context.Context,
+	name string,
+	runner func(context.Context, chan<- T) error, // Accept send-only channel here.
+	handler func(T),
+) {
+	ch := make(chan T, 10)
+
+	// Start the collector.
+	go func() {
+		log.Printf("Starting %s event collector", name)
+		if err := runner(ctx, ch); err != nil {
+			log.Fatalf("%s event collector error: %v", name, err)
+		}
+	}()
+
+	// Start the event processor.
+	go func() {
+		for event := range ch {
+			handler(event)
+		}
+	}()
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Channels listening to the events.
-	sysFileCreateEventCh := make(chan fileCreate.FileCreateEvent, 10)
-	sysProcessCreateEventCh := make(chan processCreate.ProcessCreateEvent, 10)
-	kprobeVfsOpenEventCh := make(chan vfsOpen.VfsOpenFullEvent, 10)
+	// Start all collectors using the helper function.
 
-	// Start the sysFileCreate event collector.
-	go func() {
-		log.Println("Starting fileCreate event collector")
-		if err := fileCreate.Run(ctx, sysFileCreateEventCh); err != nil {
-			log.Fatalf("fileCreate event collector error: %v", err)
-		}
-	}()
+	// NOTE: We temporarily disable the fileCreate collector because it we have kprobe:vfs_open instead
+	// startCollector(ctx, "fileCreate", fileCreate.Run,
+	// 	func(event fileCreate.FileCreateEvent) {
+	// 		filepath := string(event.Filepath[:])
+	// 		fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
+	// 			event.PID, event.UID, filepath, event.Flags, event.Mode)
+	// 	})
 
-	// Start the sysProcessCreate event collector.
-	go func() {
-		log.Println("Starting processCreate event collector")
-		if err := processCreate.Run(ctx, sysProcessCreateEventCh); err != nil {
-			log.Fatalf("processCreate event collector error: %v", err)
-		}
-	}()
-
-	// Start the vfsOpen event collector.
-	go func() {
-		log.Println("Starting vfsOpen event collector")
-		if err := vfsOpen.Run(ctx, kprobeVfsOpenEventCh); err != nil {
-			log.Fatalf("vfsOpen event collector error: %v", err)
-		}
-	}()
-
-	// Process sysFileCreate events.
-	go func() {
-		for event := range sysFileCreateEventCh {
-			filepath := string(event.Filepath[:])
-			fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
-				event.PID, event.UID, filepath, event.Flags, event.Mode)
-		}
-	}()
-
-	// Process sysProcessCreate events.
-	go func() {
-		for event := range sysProcessCreateEventCh {
+	startCollector(ctx, "processCreate", processCreate.Run,
+		func(event processCreate.ProcessCreateEvent) {
 			fmt.Printf("[sysProcessCreate] PID: %d, UID: %d, Command: %s, Filename: %s, Argc: %d, Envc: %d\n",
 				event.PID, event.UID, event.Command, event.Filename, event.Argc, event.Envc)
-		}
-	}()
+		})
 
-	// Process vfsOpen events, printing the full reassembled file path.
-	go func() {
-		for event := range kprobeVfsOpenEventCh {
-			fmt.Printf("[vfsOpen] PID: %d, UID: %d, Full Filepath: %s\n",
-				event.PID, event.UID, event.FullPath)
-		}
-	}()
+	startCollector(ctx, "vfsOpen", vfsOpen.Run,
+		func(event vfsOpen.VfsOpenFullEvent) {
+			// NOTE: We temporarily disable the vfsOpen collector because it is proved to be working
+			// fmt.Printf("[vfsOpen] PID: %d, UID: %d, Full Filepath: %s\n",
+			// 	event.PID, event.UID, event.FullPath)
+		})
 
+	// Wait for termination signal.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
 	fmt.Println("Event collectors running. Press Ctrl+C to exit.")
 	<-sigCh
+
 	fmt.Println("Termination signal received. Shutting down...")
 	cancel()
-
-	// Allow time for collectors to exit gracefully.
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second) // Allow time for graceful shutdown.
 }
