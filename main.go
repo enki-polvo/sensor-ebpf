@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -10,21 +11,19 @@ import (
 	"syscall"
 	"time"
 
-	// "sensor-ebpf/events/fileCreate"
+	"github.com/charmbracelet/huh"
+	"sensor-ebpf/events/fileCreate"
 	"sensor-ebpf/events/fileDelete"
 	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/processTerminate"
 	"sensor-ebpf/events/vfsOpen"
 )
 
-// startCollector is a generic helper function that sets up the event collector and processor.
-// name: used for logging.
-// runner: the event collector function (e.g., fileCreate.Run).
-// handler: the function to process each event.
+// startCollector is a generic helper that sets up an event collector and processor.
 func startCollector[T any](
 	ctx context.Context,
 	name string,
-	runner func(context.Context, chan<- T) error, // Accept send-only channel here.
+	runner func(context.Context, chan<- T) error,
 	handler func(T),
 ) {
 	ch := make(chan T, 10)
@@ -46,55 +45,88 @@ func startCollector[T any](
 }
 
 func main() {
+	// Use huh? to interactively ask which collectors to run.
+	var collectors []string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("Select collectors to run (minimum 1, maximum all)").
+				Options(
+					huh.NewOption("fileCreate", "fileCreate"),
+					huh.NewOption("fileDelete", "fileDelete"),
+					huh.NewOption("processCreate", "processCreate"),
+					huh.NewOption("processTerminate", "processTerminate"),
+					huh.NewOption("vfsOpen", "vfsOpen"),
+				).
+				Value(&collectors).
+				// Validate that at least one collector is chosen.
+				Validate(func(selected []string) error {
+					if len(selected) < 1 {
+						return errors.New("please select at least one collector")
+					}
+					return nil
+				}),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("You selected: %v\n", collectors)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start all collectors using the helper function.
+	// Start only the collectors that were selected.
+	for _, c := range collectors {
+		switch c {
+		case "fileCreate":
+			startCollector(ctx, "fileCreate", fileCreate.Run,
+				func(event fileCreate.FileCreateEvent) {
+					filepath := string(event.Filepath[:])
+					fmt.Printf("[fileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
+						event.PID, event.UID, filepath, event.Flags, event.Mode)
+				})
+		case "fileDelete":
+			startCollector(ctx, "fileDelete", fileDelete.Run,
+				func(event fileDelete.FileDeleteEvent) {
+					fmt.Printf("[fileDelete] PID: %d, UID: %d, Filepath: %s, Flag: %d\n",
+						event.PID, event.UID, event.Filepath, event.Flag)
+				})
+		case "processCreate":
+			startCollector(ctx, "processCreate", processCreate.Run,
+				func(event processCreate.ProcessCreateEvent) {
+					// Concatenate parameters into a string.
+					parameterStr := func(params [10][256]byte) string {
+						result := ""
+						for _, p := range params {
+							result += fmt.Sprintf("%s ", string(p[:]))
+						}
+						return result
+					}
+					fmt.Printf("[processCreate] PID: %d, PPID: %d, TGID: %d, UID: %d, Command: %s, Filename: %s, Argv: %s\n",
+						event.PID, event.PPID, event.TGID, event.UID, event.Command, event.Filename, parameterStr(event.Args))
+				})
+		case "processTerminate":
+			startCollector(ctx, "processTerminate", processTerminate.Run,
+				func(event processTerminate.ProcessTerminateEvent) {
+					fmt.Printf("[processTerminate] PID: %d, UID: %d, Cmdline: %s, Ret: %d\n",
+						event.PID, event.UID, event.Cmdline, event.Ret)
+				})
+		case "vfsOpen":
+			startCollector(ctx, "vfsOpen", vfsOpen.Run,
+				func(event vfsOpen.VfsOpenFullEvent) {
+					// Uncomment and adjust the output as needed.
+					// fmt.Printf("[vfsOpen] PID: %d, UID: %d, Full Filepath: %s, Flags: %O (%v)\n",
+					// 	event.PID, event.UID, event.FullPath, event.Flags, event.FlagsInterpretation)
+				})
+		default:
+			log.Printf("Unknown collector: %s", c)
+		}
+	}
 
-	// NOTE: We temporarily disable the fileCreate collector because it we have kprobe:vfs_open instead
-	// startCollector(ctx, "fileCreate", fileCreate.Run,
-	// 	func(event fileCreate.FileCreateEvent) {
-	// 		filepath := string(event.Filepath[:])
-	// 		fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
-	// 			event.PID, event.UID, filepath, event.Flags, event.Mode)
-	// 	})
-
-	startCollector(ctx, "fileDelete", fileDelete.Run,
-		func(event fileDelete.FileDeleteEvent) {
-			fmt.Printf("[fileDelete] PID: %d, UID: %d, Filepath: %s, Flag: %d\n",
-				event.PID, event.UID, event.Filepath, event.Flag)
-		})
-
-	startCollector(ctx, "processCreate", processCreate.Run,
-		func(event processCreate.ProcessCreateEvent) {
-			// Concatenate the parameters into a single string.
-			parameterStrConcatenator := func(parameters [10][256]byte) string {
-				result := ""
-				for _, param := range parameters {
-					result += fmt.Sprintf("%s ", string(param[:]))
-				}
-				return result
-			}
-
-			argsString := parameterStrConcatenator(event.Args)
-			// envsString := parameterStrConcatenator(event.Envs)
-			fmt.Printf("[sysProcessCreate] PID: %d, PPID: %d, TGID: %d, UID: %d, Command: %s, Filename: %s, Argv: %s\n",
-				event.PID, event.PPID, event.TGID, event.UID, event.Command, event.Filename, argsString)
-		})
-
-	startCollector(ctx, "processTerminate", processTerminate.Run,
-		// Convert event.Cmd([512]bytes) into hexadecimalized string
-		func(event processTerminate.ProcessTerminateEvent) {
-			fmt.Printf("[sysProcessTerminate] PID: %d, UID: %d, Cmdline: %s, Ret: %d\n", event.PID, event.UID, event.Cmdline, event.Ret)
-		})
-
-	startCollector(ctx, "vfsOpen", vfsOpen.Run,
-		func(event vfsOpen.VfsOpenFullEvent) {
-			// fmt.Printf("[vfsOpen] PID: %d, UID: %d, Full Filepath: %s, Flags: %O(%v)\n",
-			// 	event.PID, event.UID, event.FullPath, event.Flags, event.FlagsInterpretation)
-		})
-
-	// Wait for termination signal.
+	// Wait for a termination signal.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	fmt.Println("Event collectors running. Press Ctrl+C to exit.")
