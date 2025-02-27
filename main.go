@@ -11,6 +11,7 @@ import (
 	"time"
 
 	// "sensor-ebpf/events/fileCreate"
+	"sensor-ebpf/events/fileDelete"
 	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/processTerminate"
 	"sensor-ebpf/events/vfsOpen"
@@ -57,6 +58,12 @@ func main() {
 	// 		fmt.Printf("[sysFileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
 	// 			event.PID, event.UID, filepath, event.Flags, event.Mode)
 	// 	})
+
+	startCollector(ctx, "fileDelete", fileDelete.Run,
+		func(event fileDelete.FileDeleteEvent) {
+			fmt.Printf("[fileDelete] PID: %d, UID: %d, Filepath: %s, Flag: %d\n",
+				event.PID, event.UID, event.Filepath, event.Flag)
+		})
 
 	startCollector(ctx, "processCreate", processCreate.Run,
 		func(event processCreate.ProcessCreateEvent) {
