@@ -58,7 +58,7 @@ func Run(ctx context.Context, events chan<- FileDeleteEvent) error {
 	}
 	defer rd.Close()
 
-	log.Println("Starting fileDelete event collector")
+	log.Println("Listening for fileDelete events (tracepoint/syscalls/sys_enter_unlink, tracepoint/sysclals/sys_enter_unlinkat)")
 	// Ensure the channel gets closed once Run exits.
 	defer close(events)
 

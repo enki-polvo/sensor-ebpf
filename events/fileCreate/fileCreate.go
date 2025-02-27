@@ -58,7 +58,7 @@ func Run(ctx context.Context, events chan<- FileCreateEvent) error {
 	}
 	defer rd.Close()
 
-	log.Println("Listening for file create events (open and openat).")
+	log.Println("Listening for file create events (tracepoint/syscalls/sys_enter_open, tracepoint/syscalls/sys_enter_openat).")
 	// Ensure the channel gets closed once Run exits.
 	defer close(events)
 

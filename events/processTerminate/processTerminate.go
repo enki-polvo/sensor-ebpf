@@ -65,6 +65,7 @@ func Run(ctx context.Context, events chan<- ProcessTerminateEvent) error {
 	defer rd.Close()
 
 	// Ensure the channel gets closed once Run exits.
+	log.Println("Listening for process termination events (tracepoint/syscalls/sys_exit_execve, tracepoint/syscalls/sys_exit_execveat).")
 	defer close(events)
 
 	var eventOriginal ProcessTerminateEventOriginal

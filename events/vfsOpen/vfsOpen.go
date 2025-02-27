@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/cilium/ebpf/link"
@@ -87,6 +88,10 @@ func Run(ctx context.Context, events chan<- VfsOpenFullEvent) error {
 			segmentChain = segmentChain[:0]
 		}
 	}
+
+	// Ensure the channel gets closed once Run exits.
+	log.Printf("Listening for file creation events (kprobe/vfs_open).")
+	defer close(events)
 
 	var event FileCreateEvent
 	for {

@@ -65,6 +65,7 @@ func Run(ctx context.Context, events chan<- ProcessCreateEvent) error {
 	defer rd.Close()
 
 	// Ensure the channel gets closed once Run exits.
+	log.Println("Listening for process create events (tracepoint/syscalls/sys_enter_execve, tracepoint/syscalls/sys_enter_execveat).")
 	defer close(events)
 
 	var event ProcessCreateEvent
