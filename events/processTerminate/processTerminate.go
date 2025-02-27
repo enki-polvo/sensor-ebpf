@@ -8,19 +8,28 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
 )
 
-type ProcessTerminateEvent struct {
-	UID uint32
-	PID uint32
-	Ret uint64 // Ret is defined as "long" in the kernel, which is 64-bit on x86_64 Linux.
+type ProcessTerminateEventOriginal struct {
+	UID     uint32
+	PID     uint32
+	Ret     uint64 // Ret is defined as "long" in the kernel, which is 64-bit on x86_64 Linux.
+	Cmdline [512]byte
 }
 
-// Run starts the ProcessTerminate event collector and sends event over the provided channel.
+type ProcessTerminateEvent struct {
+	UID     uint32
+	PID     uint32
+	Ret     uint64 // Ret is defined as "long" in the kernel, which is 64-bit on x86_64 Linux.
+	Cmdline string // String representation of the command line.
+}
+
+// Run starts the ProcessTerminate event collector and sends events over the provided channel.
 // It closes the channel when exiting.
 func Run(ctx context.Context, events chan<- ProcessTerminateEvent) error {
 	// Remove resource limits.
@@ -35,7 +44,7 @@ func Run(ctx context.Context, events chan<- ProcessTerminateEvent) error {
 	}
 	defer objs.Close()
 
-	// Attach tracepoints
+	// Attach tracepoints.
 	tpExecveExit, err := link.Tracepoint("syscalls", "sys_exit_execve", objs.TraceSysExitExecve, nil)
 	if err != nil {
 		return fmt.Errorf("failed to attach tracepoint sys_exit_execve: %w", err)
@@ -48,7 +57,7 @@ func Run(ctx context.Context, events chan<- ProcessTerminateEvent) error {
 	}
 	defer tpExecveatExit.Close()
 
-	// Open a ring buffer reader on the map
+	// Open a ring buffer reader on the map.
 	rd, err := ringbuf.NewReader(objs.ProcessTerminateEventMap)
 	if err != nil {
 		return fmt.Errorf("failed to open ringbuf reader: %w", err)
@@ -58,14 +67,14 @@ func Run(ctx context.Context, events chan<- ProcessTerminateEvent) error {
 	// Ensure the channel gets closed once Run exits.
 	defer close(events)
 
-	var event ProcessTerminateEvent
+	var eventOriginal ProcessTerminateEventOriginal
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Exiting process create event collector")
+			log.Println("Exiting process termination event collector")
 			return nil
 		default:
-			// Read the next event
+			// Read the next event.
 			record, err := rd.Read()
 			if err != nil {
 				if errors.Is(err, ringbuf.ErrClosed) {
@@ -76,17 +85,30 @@ func Run(ctx context.Context, events chan<- ProcessTerminateEvent) error {
 				continue
 			}
 
-			// Parse the even t
-			err = binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &event)
+			// Parse the event.
+			err = binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &eventOriginal)
 			if err != nil {
 				log.Printf("Failed to parse event: %v", err)
 				continue
 			}
 
-			// Instead of printing the event, send it over the channeel
+			// Convert the fixed-size byte array to a string and trim trailing nulls/spaces.
+			raw := eventOriginal.Cmdline[:]
+			// Do the right trim the null and space characters.
+			s := strings.TrimRight(string(raw), "\x00")
+			s = strings.TrimRight(s, " ")
+
+			event := ProcessTerminateEvent{
+				UID:     eventOriginal.UID,
+				PID:     eventOriginal.PID,
+				Ret:     eventOriginal.Ret,
+				Cmdline: s,
+			}
+
+			// Send the event over the channel.
 			select {
 			case events <- event:
-				// Sent successfully
+				// Sent successfully.
 			case <-ctx.Done():
 				return nil
 			}

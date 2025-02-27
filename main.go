@@ -76,8 +76,9 @@ func main() {
 		})
 
 	startCollector(ctx, "processTerminate", processTerminate.Run,
+		// Convert event.Cmd([512]bytes) into hexadecimalized string
 		func(event processTerminate.ProcessTerminateEvent) {
-			fmt.Printf("[sysProcessTerminate] PID: %d, UID: %d, Ret: %d\n", event.PID, event.UID, event.Ret)
+			fmt.Printf("[sysProcessTerminate] PID: %d, UID: %d, Cmdline: %s, Ret: %d\n", event.PID, event.UID, event.Cmdline, event.Ret)
 		})
 
 	startCollector(ctx, "vfsOpen", vfsOpen.Run,
