@@ -82,7 +82,7 @@ func Run(ctx context.Context, events chan<- TcpV4ConnectEvent) error {
 	}
 	defer rd.Close()
 
-	log.Printf("Listening for TCP IPv4 connect events.")
+	log.Printf("Listening for TCP IPv4 connect events (kprobe/tcp_v4_connect, kretprobe/tcp_v4_connect)")
 	defer close(events)
 
 	for {
