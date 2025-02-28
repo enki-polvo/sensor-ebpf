@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"sensor-ebpf/events/fileCreate"
 	"sensor-ebpf/events/fileDelete"
+	"sensor-ebpf/events/networkEvent"
 	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/processTerminate"
 	"sensor-ebpf/events/vfsOpen"
@@ -54,6 +55,7 @@ func main() {
 				Options(
 					huh.NewOption("fileCreate", "fileCreate"),
 					huh.NewOption("fileDelete", "fileDelete"),
+					huh.NewOption("networkEvent", "networkEvent"),
 					huh.NewOption("processCreate", "processCreate"),
 					huh.NewOption("processTerminate", "processTerminate"),
 					huh.NewOption("vfsOpen", "vfsOpen"),
@@ -93,6 +95,13 @@ func main() {
 				func(event fileDelete.FileDeleteEvent) {
 					fmt.Printf("[fileDelete] PID: %d, UID: %d, Filepath: %s, Flag: %d\n",
 						event.PID, event.UID, event.Filepath, event.Flag)
+				})
+		case "networkEvent":
+			// TODO: Generalize this to support multiple network events.
+			startCollector(ctx, "networkEvent", networkEvent.Run,
+				func(event networkEvent.TcpV4ConnectEvent) {
+					fmt.Printf("[networkEvent] PID: %d, UID: %d, Saddr: %s, Daddr: %s, Sport: %d, Dport: %d\n",
+						event.PID, event.UID, event.Saddr, event.Daddr, event.Sport, event.Dport)
 				})
 		case "processCreate":
 			startCollector(ctx, "processCreate", processCreate.Run,

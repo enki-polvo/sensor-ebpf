@@ -68,7 +68,6 @@ struct {
 //   args[2] = envp
 SEC("tracepoint/syscalls/sys_enter_execve")
 int trace_sys_enter_execve(struct tracepoint_syscalls_sys_enter_execve *ctx) {
-    bpf_printk("sys_enter_execve is executed");
     struct exec_event *e;
     const char *filename;
     const char *const *argv;
@@ -151,7 +150,6 @@ int trace_sys_enter_execve(struct tracepoint_syscalls_sys_enter_execve *ctx) {
 SEC("tracepoint/syscalls/sys_enter_execveat")
 int trace_sys_enter_execveat(
     struct tracepoint_syscalls_sys_enter_execveat *ctx) {
-    bpf_printk("sys_enter_execveat is executed");
     struct exec_event *e;
     const char *filename;
     const char *const *argv;
