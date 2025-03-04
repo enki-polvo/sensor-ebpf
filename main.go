@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/huh"
+	"sensor-ebpf/events/bashReadline"
 	"sensor-ebpf/events/fileCreate"
 	"sensor-ebpf/events/fileDelete"
 	"sensor-ebpf/events/networkEvent"
@@ -53,6 +54,7 @@ func main() {
 			huh.NewMultiSelect[string]().
 				Title("Select collectors to run (minimum 1, maximum all)").
 				Options(
+					huh.NewOption("bashReadline", "bashReadline"),
 					huh.NewOption("fileCreate", "fileCreate"),
 					huh.NewOption("fileDelete", "fileDelete"),
 					huh.NewOption("networkEvent", "networkEvent"),
@@ -83,6 +85,11 @@ func main() {
 	// Start only the collectors that were selected.
 	for _, c := range collectors {
 		switch c {
+		case "bashReadline":
+			startCollector(ctx, "bashReadline", bashReadline.Run,
+				func(event bashReadline.BashReadlineEvent) {
+					fmt.Printf("[bashCommandline] PID: %d, UID: %d, Bash Commandline: %s\n", event.PID, event.UID, event.Commandline)
+				})
 		case "fileCreate":
 			startCollector(ctx, "fileCreate", fileCreate.Run,
 				func(event fileCreate.FileCreateEvent) {
