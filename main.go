@@ -19,6 +19,7 @@ import (
 	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/processTerminate"
 	"sensor-ebpf/events/vfsOpen"
+	"sensor-ebpf/utility"
 )
 
 // startCollector is a generic helper that sets up an event collector and processor.
@@ -88,27 +89,31 @@ func main() {
 		case "bashReadline":
 			startCollector(ctx, "bashReadline", bashReadline.Run,
 				func(event bashReadline.BashReadlineEvent) {
-					fmt.Printf("[bashCommandline] PID: %d, UID: %d, Bash Commandline: %s\n", event.PID, event.UID, event.Commandline)
+					username, _ := utility.GetUsername(event.UID)
+					fmt.Printf("[bashCommandline] PID: %d, UID: %d(%s), Bash Commandline: %s\n", event.PID, event.UID, username, event.Commandline)
 				})
 		case "fileCreate":
 			startCollector(ctx, "fileCreate", fileCreate.Run,
 				func(event fileCreate.FileCreateEvent) {
 					filepath := string(event.Filepath[:])
-					fmt.Printf("[fileCreate] PID: %d, UID: %d, Filepath: %s, Flags: %d, Mode: %d\n",
-						event.PID, event.UID, filepath, event.Flags, event.Mode)
+					username, _ := utility.GetUsername(event.UID)
+					fmt.Printf("[fileCreate] PID: %d, UID: %d(%s), Filepath: %s, Flags: %d, Mode: %d\n",
+						event.PID, event.UID, username, filepath, event.Flags, event.Mode)
 				})
 		case "fileDelete":
 			startCollector(ctx, "fileDelete", fileDelete.Run,
 				func(event fileDelete.FileDeleteEvent) {
-					fmt.Printf("[fileDelete] PID: %d, UID: %d, Filepath: %s, Flag: %d\n",
-						event.PID, event.UID, event.Filepath, event.Flag)
+					username, _ := utility.GetUsername(event.UID)
+					fmt.Printf("[fileDelete] PID: %d, UID: %d(%s), Filepath: %s, Flag: %d\n",
+						event.PID, event.UID, username, event.Filepath, event.Flag)
 				})
 		case "networkEvent":
 			// TODO: Generalize this to support multiple network events.
 			startCollector(ctx, "networkEvent", networkEvent.Run,
 				func(event networkEvent.TcpV4ConnectEvent) {
-					fmt.Printf("[networkEvent] PID: %d, UID: %d, Saddr: %s, Daddr: %s, Sport: %d, Dport: %d\n",
-						event.PID, event.UID, event.Saddr, event.Daddr, event.Sport, event.Dport)
+					username, _ := utility.GetUsername(event.UID)
+					fmt.Printf("[networkEvent] PID: %d, UID: %d(%s), Saddr: %s, Daddr: %s, Sport: %d, Dport: %d\n",
+						event.PID, event.UID, username, event.Saddr, event.Daddr, event.Sport, event.Dport)
 				})
 		case "processCreate":
 			startCollector(ctx, "processCreate", processCreate.Run,
@@ -121,21 +126,25 @@ func main() {
 						}
 						return result
 					}
-					fmt.Printf("[processCreate] PID: %d, PPID: %d, TGID: %d, UID: %d, Command: %s, Filename: %s, Argv: %s\n",
-						event.PID, event.PPID, event.TGID, event.UID, event.Command, event.Filename, parameterStr(event.Args))
+					username, _ := utility.GetUsername(event.UID)
+
+					fmt.Printf("[processCreate] PID: %d, PPID: %d, TGID: %d, UID: %d(%s), Command: %s, Filename: %s, Argv: %s\n",
+						event.PID, event.PPID, event.TGID, event.UID, username, event.Command, event.Filename, parameterStr(event.Args))
 				})
 		case "processTerminate":
 			startCollector(ctx, "processTerminate", processTerminate.Run,
 				func(event processTerminate.ProcessTerminateEvent) {
-					fmt.Printf("[processTerminate] PID: %d, UID: %d, Cmdline: %s, Ret: %d\n",
-						event.PID, event.UID, event.Cmdline, event.Ret)
+					username, _ := utility.GetUsername(event.UID)
+					fmt.Printf("[processTerminate] PID: %d, UID: %d(%s), Cmdline: %s, Ret: %d\n",
+						event.PID, event.UID, username, event.Cmdline, event.Ret)
 				})
 		case "vfsOpen":
 			startCollector(ctx, "vfsOpen", vfsOpen.Run,
 				func(event vfsOpen.VfsOpenFullEvent) {
 					// Uncomment and adjust the output as needed.
-					// fmt.Printf("[vfsOpen] PID: %d, UID: %d, Full Filepath: %s, Flags: %O (%v)\n",
-					// 	event.PID, event.UID, event.FullPath, event.Flags, event.FlagsInterpretation)
+					username, _ := utility.GetUsername(event.UID)
+					fmt.Printf("[vfsOpen] PID: %d, UID: %d(%s), Full Filepath: %s, Flags: %O (%v)\n",
+						event.PID, event.UID, username, event.FullPath, event.Flags, event.FlagsInterpretation)
 				})
 		default:
 			log.Printf("Unknown collector: %s", c)
