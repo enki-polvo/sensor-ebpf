@@ -1,4 +1,4 @@
-// events/tcpAccept/tcpAccept_kprobe.c
+// events/tcpV4Accept/tcpV4Accept.c
 // go: build ignore
 #define __TARGET_ARCH_x86
 #include "vmlinux.h"

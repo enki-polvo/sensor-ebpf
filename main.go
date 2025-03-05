@@ -17,7 +17,7 @@ import (
 	"sensor-ebpf/events/fileDelete"
 	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/processTerminate"
-	"sensor-ebpf/events/tcpAccept"
+	"sensor-ebpf/events/tcpV4Accept"
 	"sensor-ebpf/events/tcpV4Connect"
 	"sensor-ebpf/events/vfsOpen"
 	"sensor-ebpf/utility"
@@ -61,7 +61,7 @@ func main() {
 					huh.NewOption("fileDelete", "fileDelete"),
 					huh.NewOption("processCreate", "processCreate"),
 					huh.NewOption("processTerminate", "processTerminate"),
-					huh.NewOption("tcpAccept", "tcpAccept"),
+					huh.NewOption("tcpV4Accept", "tcpV4Accept"),
 					huh.NewOption("tcpV4Connect", "tcpV4Connect"),
 					huh.NewOption("vfsOpen", "vfsOpen"),
 				).
@@ -132,10 +132,10 @@ func main() {
 					fmt.Printf("[processTerminate] PID: %d, UID: %d(%s), Cmdline: %s, Ret: %d\n",
 						event.PID, event.UID, username, event.Cmdline, event.Ret)
 				})
-		case "tcpAccept":
-			startCollector(ctx, "tcpAccept", tcpAccept.Run,
-				func(event tcpAccept.TcpV4AcceptEvent) {
-					fmt.Printf("[tcpAccept] PID: %d, UID: %d, LocalIP: %s, RemoteIP: %s, LocalPort: %d, RemotePort: %d\n",
+		case "tcpV4Accept":
+			startCollector(ctx, "tcpV4Accept", tcpV4Accept.Run,
+				func(event tcpV4Accept.TcpV4AcceptEvent) {
+					fmt.Printf("[tcpV4Accept] PID: %d, UID: %d, LocalIP: %s, RemoteIP: %s, LocalPort: %d, RemotePort: %d\n",
 						event.PID, event.UID, event.LocalIP, event.RemoteIP, event.LocalPort, event.RemotePort)
 				})
 		case "tcpV4Connect":

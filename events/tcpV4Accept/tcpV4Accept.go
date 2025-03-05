@@ -1,5 +1,5 @@
-// events/tcpAccept/tcpAccept.go
-package tcpAccept
+// events/tcpV4Accept/tcpV4Accept.go
+package tcpV4Accept
 
 import (
 	"bytes"
@@ -55,8 +55,8 @@ func Run(ctx context.Context, events chan<- TcpV4AcceptEvent) error {
 	}
 
 	// Load pre-compiled BPF objects.
-	objs := tcpAcceptObjects{}
-	if err := loadTcpAcceptObjects(&objs, nil); err != nil {
+	objs := tcpV4AcceptObjects{}
+	if err := loadTcpV4AcceptObjects(&objs, nil); err != nil {
 		return fmt.Errorf("failed to load BPF objects: %w", err)
 	}
 	defer objs.Close()
