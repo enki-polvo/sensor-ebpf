@@ -18,6 +18,7 @@ import (
 	"sensor-ebpf/events/networkEvent"
 	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/processTerminate"
+	"sensor-ebpf/events/tcpAccept"
 	"sensor-ebpf/events/vfsOpen"
 	"sensor-ebpf/utility"
 )
@@ -61,6 +62,7 @@ func main() {
 					huh.NewOption("networkEvent", "networkEvent"),
 					huh.NewOption("processCreate", "processCreate"),
 					huh.NewOption("processTerminate", "processTerminate"),
+					huh.NewOption("tcpAccept", "tcpAccept"),
 					huh.NewOption("vfsOpen", "vfsOpen"),
 				).
 				Value(&collectors).
@@ -137,6 +139,12 @@ func main() {
 					username, _ := utility.GetUsername(event.UID)
 					fmt.Printf("[processTerminate] PID: %d, UID: %d(%s), Cmdline: %s, Ret: %d\n",
 						event.PID, event.UID, username, event.Cmdline, event.Ret)
+				})
+		case "tcpAccept":
+			startCollector(ctx, "tcpAccept", tcpAccept.Run,
+				func(event tcpAccept.TcpV4AcceptEvent) {
+					fmt.Printf("[tcpAccept] PID: %d, UID: %d, LocalIP: %s, RemoteIP: %s, LocalPort: %d, RemotePort: %d\n",
+						event.PID, event.UID, event.LocalIP, event.RemoteIP, event.LocalPort, event.RemotePort)
 				})
 		case "vfsOpen":
 			startCollector(ctx, "vfsOpen", vfsOpen.Run,
