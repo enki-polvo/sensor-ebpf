@@ -15,10 +15,10 @@ import (
 	"sensor-ebpf/events/bashReadline"
 	"sensor-ebpf/events/fileCreate"
 	"sensor-ebpf/events/fileDelete"
-	"sensor-ebpf/events/networkEvent"
 	"sensor-ebpf/events/processCreate"
 	"sensor-ebpf/events/processTerminate"
 	"sensor-ebpf/events/tcpAccept"
+	"sensor-ebpf/events/tcpV4Connect"
 	"sensor-ebpf/events/vfsOpen"
 	"sensor-ebpf/utility"
 )
@@ -59,10 +59,10 @@ func main() {
 					huh.NewOption("bashReadline", "bashReadline"),
 					huh.NewOption("fileCreate", "fileCreate"),
 					huh.NewOption("fileDelete", "fileDelete"),
-					huh.NewOption("networkEvent", "networkEvent"),
 					huh.NewOption("processCreate", "processCreate"),
 					huh.NewOption("processTerminate", "processTerminate"),
 					huh.NewOption("tcpAccept", "tcpAccept"),
+					huh.NewOption("tcpV4Connect", "tcpV4Connect"),
 					huh.NewOption("vfsOpen", "vfsOpen"),
 				).
 				Value(&collectors).
@@ -109,14 +109,6 @@ func main() {
 					fmt.Printf("[fileDelete] PID: %d, UID: %d(%s), Filepath: %s, Flag: %d\n",
 						event.PID, event.UID, username, event.Filepath, event.Flag)
 				})
-		case "networkEvent":
-			// TODO: Generalize this to support multiple network events.
-			startCollector(ctx, "networkEvent", networkEvent.Run,
-				func(event networkEvent.TcpV4ConnectEvent) {
-					username, _ := utility.GetUsername(event.UID)
-					fmt.Printf("[networkEvent] PID: %d, UID: %d(%s), Saddr: %s, Daddr: %s, Sport: %d, Dport: %d\n",
-						event.PID, event.UID, username, event.Saddr, event.Daddr, event.Sport, event.Dport)
-				})
 		case "processCreate":
 			startCollector(ctx, "processCreate", processCreate.Run,
 				func(event processCreate.ProcessCreateEvent) {
@@ -145,6 +137,13 @@ func main() {
 				func(event tcpAccept.TcpV4AcceptEvent) {
 					fmt.Printf("[tcpAccept] PID: %d, UID: %d, LocalIP: %s, RemoteIP: %s, LocalPort: %d, RemotePort: %d\n",
 						event.PID, event.UID, event.LocalIP, event.RemoteIP, event.LocalPort, event.RemotePort)
+				})
+		case "tcpV4Connect":
+			startCollector(ctx, "tcpV4Connect", tcpV4Connect.Run,
+				func(event tcpV4Connect.TcpV4ConnectEvent) {
+					username, _ := utility.GetUsername(event.UID)
+					fmt.Printf("[tcpV4Connect] PID: %d, UID: %d(%s), Saddr: %s, Daddr: %s, Sport: %d, Dport: %d\n",
+						event.PID, event.UID, username, event.Saddr, event.Daddr, event.Sport, event.Dport)
 				})
 		case "vfsOpen":
 			startCollector(ctx, "vfsOpen", vfsOpen.Run,

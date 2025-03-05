@@ -1,7 +1,4 @@
-// TODO: This code should be moved into events/networkEvent/tcp/tcpConnect.c to
-// be hierarchical.
-//
-// events/networkEvent/tcpConnect.c
+// events/tcpV4Connect/tcpV4Connect.c
 // go:build ignore
 #define __TARGET_ARCH_x86
 #include "vmlinux.h"

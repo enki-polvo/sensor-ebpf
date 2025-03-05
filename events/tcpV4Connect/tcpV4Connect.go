@@ -1,4 +1,5 @@
-package networkEvent
+// events/tcpV4Connect/tcpV4Connect.go
+package tcpV4Connect
 
 import (
 	"bytes"
@@ -55,8 +56,8 @@ func Run(ctx context.Context, events chan<- TcpV4ConnectEvent) error {
 	}
 
 	// Load pre-compiled BPF objects.
-	objs := tcpConnectObjects{}
-	if err := loadTcpConnectObjects(&objs, nil); err != nil {
+	objs := tcpV4ConnectObjects{}
+	if err := loadTcpV4ConnectObjects(&objs, nil); err != nil {
 		return fmt.Errorf("failed to load BPF objects: %w", err)
 	}
 	defer objs.Close()
